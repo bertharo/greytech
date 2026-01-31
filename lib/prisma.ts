@@ -9,10 +9,19 @@ function getPrismaClient() {
   }
   
   if (!_PrismaClient) {
-    // Use require for @prisma/client - webpack externalizes it so it loads at runtime
-    // @ts-ignore - @prisma/client is externalized, so this works at runtime
-    const prismaModule = require('@prisma/client')
-    _PrismaClient = prismaModule.PrismaClient || prismaModule.default?.PrismaClient
+    try {
+      // Use require for @prisma/client - webpack externalizes it so it loads at runtime
+      // @ts-ignore - @prisma/client is externalized, so this works at runtime
+      const prismaModule = require('@prisma/client')
+      _PrismaClient = prismaModule.PrismaClient || prismaModule.default?.PrismaClient
+      
+      if (!_PrismaClient) {
+        throw new Error('PrismaClient not found in @prisma/client module')
+      }
+    } catch (error: any) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to load Prisma Client: ${errorMsg}. Make sure Prisma client is generated (run: npx prisma generate)`)
+    }
   }
   
   return _PrismaClient
