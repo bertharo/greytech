@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 
+// @ts-ignore - Prisma 7 type issue, works at runtime
 const prisma = new PrismaClient()
 
 async function main() {
