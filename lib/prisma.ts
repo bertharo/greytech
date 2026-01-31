@@ -53,10 +53,16 @@ function getPrismaClient() {
             const requireFunc = new Function('path', 'return require(path)')
             prismaModule = requireFunc(prismaPath)
           } catch (e4) {
+            const errorMessages = [
+              e instanceof Error ? e.message : String(e),
+              e2 instanceof Error ? e2.message : String(e2),
+              e3 instanceof Error ? e3.message : String(e3),
+              e4 instanceof Error ? e4.message : String(e4)
+            ]
             throw new Error(
               `Failed to load Prisma Client from ${prismaPath}. ` +
-              `Tried: require (${e?.message}), createRequire (${e2?.message}), ` +
-              `createRequire with __dirname (${e3?.message}), Function constructor (${e4?.message})`
+              `Tried: require (${errorMessages[0]}), createRequire (${errorMessages[1]}), ` +
+              `createRequire with __dirname (${errorMessages[2]}), Function constructor (${errorMessages[3]})`
             )
           }
         }
