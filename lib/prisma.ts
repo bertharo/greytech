@@ -1,6 +1,5 @@
-import path from 'path'
-
-// Lazy load Prisma Client at runtime to avoid webpack bundling issues
+// Use standard @prisma/client import which works better in serverless environments
+// The @prisma/client package will resolve to the generated client
 let _PrismaClient: any = null
 let _prismaInstance: any = null
 
@@ -10,68 +9,46 @@ function getPrismaClient() {
   }
   
   if (!_PrismaClient) {
-    // Try multiple path resolutions for different environments
-    const possiblePaths = [
-      // Standard path
-      path.join(process.cwd(), 'node_modules', '.prisma', 'client', 'client'),
-      // Relative path (for serverless)
-      path.resolve('node_modules', '.prisma', 'client', 'client'),
-      // Absolute path fallback
-      '/var/task/node_modules/.prisma/client/client', // AWS Lambda
-      '/tmp/node_modules/.prisma/client/client', // Some serverless
-    ]
-    
-    let prismaModule: any = null
-    let lastError: any = null
-    let successfulPath: string | null = null
-    
-    // Try each path with different require methods
-    for (const prismaPath of possiblePaths) {
-      // Method 1: Direct require
-      try {
-        // @ts-ignore - require exists at runtime in Node.js
-        if (typeof require !== 'undefined') {
-          prismaModule = require(prismaPath)
-          successfulPath = prismaPath
-          break
+    try {
+      // Try to use @prisma/client which should work in most environments
+      // @prisma/client will resolve to .prisma/client/default or .prisma/client/client
+      // @ts-ignore - Dynamic import to avoid webpack bundling
+      const prismaModule = require('@prisma/client')
+      _PrismaClient = prismaModule.PrismaClient
+    } catch (e) {
+      // Fallback: try direct path resolution
+      const path = require('path')
+      const possiblePaths = [
+        path.join(process.cwd(), 'node_modules', '.prisma', 'client', 'default'),
+        path.join(process.cwd(), 'node_modules', '.prisma', 'client', 'client'),
+        '/var/task/node_modules/.prisma/client/default',
+        '/var/task/node_modules/.prisma/client/client',
+      ]
+      
+      let prismaModule: any = null
+      let lastError: any = e
+      
+      for (const prismaPath of possiblePaths) {
+        try {
+          // Try require if available
+          if (typeof require !== 'undefined') {
+            prismaModule = require(prismaPath)
+            if (prismaModule?.PrismaClient) {
+              _PrismaClient = prismaModule.PrismaClient
+              return _PrismaClient
+            }
+          }
+        } catch (e2) {
+          lastError = e2
         }
-      } catch (e) {
-        lastError = e
       }
       
-      // Method 2: createRequire
-      try {
-        // @ts-ignore
-        const module = require('module')
-        const { createRequire } = module
-        const requireFunc = createRequire(process.cwd() + '/package.json')
-        prismaModule = requireFunc(prismaPath)
-        successfulPath = prismaPath
-        break
-      } catch (e2) {
-        lastError = e2
-      }
-      
-      // Method 3: Function constructor (bypasses webpack analysis)
-      try {
-        const requireFunc = new Function('path', 'return require(path)')
-        prismaModule = requireFunc(prismaPath)
-        successfulPath = prismaPath
-        break
-      } catch (e3) {
-        lastError = e3
-      }
-    }
-    
-    if (!prismaModule || !prismaModule.PrismaClient) {
       const errorMsg = lastError instanceof Error ? lastError.message : String(lastError)
       throw new Error(
-        `Failed to load Prisma Client. Tried paths: ${possiblePaths.join(', ')}. ` +
-        `Last error: ${errorMsg}. Successful path: ${successfulPath || 'none'}`
+        `Failed to load Prisma Client. Tried @prisma/client and paths: ${possiblePaths.join(', ')}. ` +
+        `Error: ${errorMsg}`
       )
     }
-    
-    _PrismaClient = prismaModule.PrismaClient
   }
   
   return _PrismaClient

@@ -7,30 +7,18 @@ const nextConfig: NextConfig = {
     if (isServer) {
       // Externalize Prisma client so it's loaded at runtime, not bundled
       const originalExternals = config.externals || []
-      // Externalize Prisma client and related modules
-      const prismaPath = path.join(process.cwd(), 'node_modules/.prisma/client/client')
-      const prismaModules = [
-        prismaPath,
-        '@prisma/client',
-        '.prisma/client',
-        '.prisma/client/client',
-        '.prisma/client/default'
-      ]
-      
+      // Externalize @prisma/client so it's not bundled
+      // This allows it to be loaded at runtime from node_modules
       config.externals = [
         ...(Array.isArray(originalExternals) ? originalExternals : [originalExternals]),
+        '@prisma/client',
+        '.prisma/client',
         ({ request }: { request?: string }, callback: (err?: Error | null, result?: string) => void) => {
-          // Externalize any require to Prisma-related paths
+          // Externalize any Prisma-related requests
           if (request && typeof request === 'string') {
-            // Check if it's a Prisma-related module
-            if (prismaModules.some(mod => request.includes(mod) || request === mod)) {
-              // Use relative path that works in production
-              const relativePath = path.relative(process.cwd(), prismaPath)
-              return callback(null, `commonjs ${relativePath}`)
-            }
-            // Also check for absolute paths
-            if (request === prismaPath || request.startsWith(prismaPath)) {
-              return callback(null, `commonjs ${prismaPath}`)
+            if (request.includes('.prisma/client') || request.includes('@prisma/client')) {
+              // Keep as external - don't bundle
+              return callback(null, `commonjs ${request}`)
             }
           }
           callback()
