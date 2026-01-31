@@ -10,23 +10,44 @@ function getPrismaClient() {
   }
   
   if (!_PrismaClient) {
+    // Build the path dynamically to prevent webpack from resolving it
+    const parts = ['node_modules', '.prisma', 'client', 'client']
+    const prismaPath = path.join(process.cwd(), ...parts)
+    
+    // Try multiple approaches to load the module
+    let prismaModule: any = null
+    
+    // Approach 1: Use createRequire if available (ES modules)
     try {
-      // Use dynamic require that webpack can't statically analyze
-      // Build the path dynamically to prevent webpack from resolving it
-      const parts = ['node_modules', '.prisma', 'client', 'client']
-      const prismaPath = path.join(process.cwd(), ...parts)
-      
-      // Use Function constructor to create require that webpack can't analyze
-      // This ensures it's only executed at runtime, not during build
-      const requireFunc = new Function('path', 'return require(path)')
-      // @ts-ignore - Prisma 7 custom output path
-      const prismaModule = requireFunc(prismaPath)
-      _PrismaClient = prismaModule.PrismaClient
-    } catch (error) {
-      // During build, the module might not be available
-      // This will be retried at runtime
-      throw new Error(`Failed to load Prisma Client: ${error}`)
+      const { createRequire } = require('module')
+      // Get the current file's directory or use process.cwd() as fallback
+      const basePath = typeof __dirname !== 'undefined' ? __dirname : process.cwd()
+      const requireFunc = createRequire(path.join(basePath, 'package.json'))
+      prismaModule = requireFunc(prismaPath)
+    } catch (e) {
+      // Approach 2: Use direct require (CommonJS)
+      try {
+        // @ts-ignore - require may not be in types but exists at runtime in Node
+        const requireFunc = typeof require !== 'undefined' ? require : global.require
+        if (requireFunc) {
+          prismaModule = requireFunc(prismaPath)
+        }
+      } catch (e2) {
+        // Approach 3: Use Function constructor as last resort
+        try {
+          const requireFunc = new Function('path', 'return require(path)')
+          prismaModule = requireFunc(prismaPath)
+        } catch (e3) {
+          throw new Error(`Failed to load Prisma Client. Tried createRequire, require, and Function constructor. Last error: ${e3}`)
+        }
+      }
     }
+    
+    if (!prismaModule || !prismaModule.PrismaClient) {
+      throw new Error(`Prisma Client not found at ${prismaPath}`)
+    }
+    
+    _PrismaClient = prismaModule.PrismaClient
   }
   
   return _PrismaClient
@@ -44,22 +65,30 @@ function getPrismaInstance() {
   return _prismaInstance
 }
 
-// Only initialize at module load if we're not in a build context
-// During build, this will be deferred until runtime
-let prisma: any
-if (process.env.NEXT_PHASE !== 'phase-production-build') {
-  prisma = getPrismaInstance()
-  if (process.env.NODE_ENV !== 'production') {
-    globalForPrisma.prisma = prisma
-  }
-} else {
-  // During build, create a proxy that will initialize on first use
-  prisma = new Proxy({} as any, {
-    get(target, prop) {
-      const instance = getPrismaInstance()
-      return instance[prop]
+// Create a proxy that initializes on first access
+// This defers initialization until actually needed
+const prisma = new Proxy({} as any, {
+  get(target, prop) {
+    const instance = getPrismaInstance()
+    const value = instance[prop]
+    
+    // If it's a function, bind it to the instance
+    if (typeof value === 'function') {
+      return value.bind(instance)
     }
-  })
+    
+    return value
+  },
+  set(target, prop, value) {
+    const instance = getPrismaInstance()
+    instance[prop] = value
+    return true
+  }
+})
+
+// Store in global for reuse
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma
 }
 
 export { prisma }
