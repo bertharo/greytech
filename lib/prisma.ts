@@ -1,68 +1,52 @@
-// Use dynamic require for @prisma/client - webpack will externalize it
-// This works in both CommonJS and serverless environments
-let _PrismaClient: any = null
-let _prismaInstance: any = null
+// Prisma Client singleton for serverless environments
+// This pattern works well with Vercel and other serverless platforms
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: any | undefined
+}
 
 function getPrismaClient() {
   if (typeof window !== 'undefined') {
     throw new Error('Prisma Client should only be used on the server')
   }
   
-  if (!_PrismaClient) {
-    try {
-      // Use require for @prisma/client - webpack externalizes it so it loads at runtime
-      // @ts-ignore - @prisma/client is externalized, so this works at runtime
-      const prismaModule = require('@prisma/client')
-      _PrismaClient = prismaModule.PrismaClient || prismaModule.default?.PrismaClient
-      
-      if (!_PrismaClient) {
-        throw new Error('PrismaClient not found in @prisma/client module')
-      }
-    } catch (error: any) {
-      const errorMsg = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to load Prisma Client: ${errorMsg}. Make sure Prisma client is generated (run: npx prisma generate)`)
-    }
+  try {
+    // Use require for @prisma/client - webpack externalizes it so it loads at runtime
+    // @ts-ignore - @prisma/client is externalized, so this works at runtime
+    const { PrismaClient } = require('@prisma/client')
+    return PrismaClient
+  } catch (error: any) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    // Log detailed error for debugging
+    console.error('Prisma Client loading error:', {
+      message: errorMsg,
+      stack: errorStack,
+      code: error?.code,
+      requireStack: error?.requireStack
+    })
+    
+    throw new Error(
+      `Failed to load Prisma Client: ${errorMsg}. ` +
+      `Make sure Prisma client is generated (run: npx prisma generate). ` +
+      `In Vercel, ensure postinstall script runs during build.`
+    )
   }
-  
-  return _PrismaClient
 }
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: any | undefined
-}
-
+// Initialize Prisma Client instance
+// Use global to prevent multiple instances in serverless environments
 function getPrismaInstance() {
-  if (!_prismaInstance) {
+  if (!globalForPrisma.prisma) {
     const PrismaClientClass = getPrismaClient()
-    _prismaInstance = globalForPrisma.prisma ?? new PrismaClientClass()
+    globalForPrisma.prisma = new PrismaClientClass({
+      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    })
   }
-  return _prismaInstance
+  return globalForPrisma.prisma
 }
 
-// Create a proxy that initializes on first access
-// This defers initialization until actually needed
-const prisma = new Proxy({} as any, {
-  get(target, prop) {
-    const instance = getPrismaInstance()
-    const value = instance[prop]
-    
-    // If it's a function, bind it to the instance
-    if (typeof value === 'function') {
-      return value.bind(instance)
-    }
-    
-    return value
-  },
-  set(target, prop, value) {
-    const instance = getPrismaInstance()
-    instance[prop] = value
-    return true
-  }
-})
-
-// Store in global for reuse
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
-
-export { prisma }
+// Export prisma instance
+// In serverless, this will be initialized on first use per function invocation
+export const prisma = getPrismaInstance()
