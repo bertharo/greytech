@@ -47,6 +47,25 @@ function getPrismaInstance() {
   return globalForPrisma.prisma
 }
 
-// Export prisma instance
+// Export prisma as a getter to avoid initialization during build
 // In serverless, this will be initialized on first use per function invocation
-export const prisma = getPrismaInstance()
+const prismaProxy = new Proxy({} as any, {
+  get(target, prop) {
+    const instance = getPrismaInstance()
+    const value = instance[prop]
+    
+    // If it's a function, bind it to the instance
+    if (typeof value === 'function') {
+      return value.bind(instance)
+    }
+    
+    return value
+  },
+  set(target, prop, value) {
+    const instance = getPrismaInstance()
+    instance[prop] = value
+    return true
+  }
+})
+
+export const prisma = prismaProxy
