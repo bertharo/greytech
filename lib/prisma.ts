@@ -1,5 +1,7 @@
-// Use standard @prisma/client import which works better in serverless environments
-// The @prisma/client package will resolve to the generated client
+// Import PrismaClient directly - webpack will externalize it
+// This is the most reliable approach for serverless environments
+import { PrismaClient } from '@prisma/client'
+
 let _PrismaClient: any = null
 let _prismaInstance: any = null
 
@@ -9,46 +11,9 @@ function getPrismaClient() {
   }
   
   if (!_PrismaClient) {
-    try {
-      // Try to use @prisma/client which should work in most environments
-      // @prisma/client will resolve to .prisma/client/default or .prisma/client/client
-      // @ts-ignore - Dynamic import to avoid webpack bundling
-      const prismaModule = require('@prisma/client')
-      _PrismaClient = prismaModule.PrismaClient
-    } catch (e) {
-      // Fallback: try direct path resolution
-      const path = require('path')
-      const possiblePaths = [
-        path.join(process.cwd(), 'node_modules', '.prisma', 'client', 'default'),
-        path.join(process.cwd(), 'node_modules', '.prisma', 'client', 'client'),
-        '/var/task/node_modules/.prisma/client/default',
-        '/var/task/node_modules/.prisma/client/client',
-      ]
-      
-      let prismaModule: any = null
-      let lastError: any = e
-      
-      for (const prismaPath of possiblePaths) {
-        try {
-          // Try require if available
-          if (typeof require !== 'undefined') {
-            prismaModule = require(prismaPath)
-            if (prismaModule?.PrismaClient) {
-              _PrismaClient = prismaModule.PrismaClient
-              return _PrismaClient
-            }
-          }
-        } catch (e2) {
-          lastError = e2
-        }
-      }
-      
-      const errorMsg = lastError instanceof Error ? lastError.message : String(lastError)
-      throw new Error(
-        `Failed to load Prisma Client. Tried @prisma/client and paths: ${possiblePaths.join(', ')}. ` +
-        `Error: ${errorMsg}`
-      )
-    }
+    // Use the imported PrismaClient directly
+    // Since @prisma/client is externalized by webpack, this will work at runtime
+    _PrismaClient = PrismaClient
   }
   
   return _PrismaClient

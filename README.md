@@ -57,6 +57,12 @@ NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="your-secret-key-change-in-production-min-32-chars"
 ```
 
+**For Production (Vercel/Serverless):**
+- Set `NEXTAUTH_SECRET` as an environment variable (generate with: `openssl rand -base64 32`)
+- Set `NEXTAUTH_URL` to your production domain
+- Use a proper database (PostgreSQL recommended) instead of SQLite
+- Ensure `prisma generate` runs during build (already configured in package.json)
+
 4. Set up the database:
 ```bash
 npx prisma migrate dev

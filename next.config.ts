@@ -7,17 +7,21 @@ const nextConfig: NextConfig = {
     if (isServer) {
       // Externalize Prisma client so it's loaded at runtime, not bundled
       const originalExternals = config.externals || []
-      // Externalize @prisma/client so it's not bundled
-      // This allows it to be loaded at runtime from node_modules
+      // Externalize @prisma/client and related modules
+      // This ensures they're loaded from node_modules at runtime, not bundled
       config.externals = [
         ...(Array.isArray(originalExternals) ? originalExternals : [originalExternals]),
         '@prisma/client',
         '.prisma/client',
         ({ request }: { request?: string }, callback: (err?: Error | null, result?: string) => void) => {
-          // Externalize any Prisma-related requests
+          // Externalize any Prisma-related module requests
           if (request && typeof request === 'string') {
-            if (request.includes('.prisma/client') || request.includes('@prisma/client')) {
-              // Keep as external - don't bundle
+            if (
+              request === '@prisma/client' ||
+              request.includes('.prisma/client') ||
+              request.startsWith('.prisma/')
+            ) {
+              // Externalize as commonjs module
               return callback(null, `commonjs ${request}`)
             }
           }
