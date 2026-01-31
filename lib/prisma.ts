@@ -16,35 +16,55 @@ function getPrismaClient() {
     
     // Try multiple approaches to load the module
     let prismaModule: any = null
+    let lastError: any = null
     
-    // Approach 1: Use createRequire if available (ES modules)
+    // Approach 1: Use direct require (most common in Node.js)
     try {
-      const { createRequire } = require('module')
-      // Get the current file's directory or use process.cwd() as fallback
-      const basePath = typeof __dirname !== 'undefined' ? __dirname : process.cwd()
-      const requireFunc = createRequire(path.join(basePath, 'package.json'))
-      prismaModule = requireFunc(prismaPath)
+      // @ts-ignore - require exists at runtime in Node.js
+      if (typeof require !== 'undefined') {
+        prismaModule = require(prismaPath)
+      }
     } catch (e) {
-      // Approach 2: Use direct require (CommonJS)
+      lastError = e
+      // Approach 2: Use createRequire for ES module contexts
       try {
-        // @ts-ignore - require may not be in types but exists at runtime in Node
-        const requireFunc = typeof require !== 'undefined' ? require : global.require
-        if (requireFunc) {
-          prismaModule = requireFunc(prismaPath)
-        }
+        // @ts-ignore
+        const { createRequire } = require('module')
+        // Use process.cwd() as base since __dirname might not be available
+        const requireFunc = createRequire(path.join(process.cwd(), 'package.json'))
+        prismaModule = requireFunc(prismaPath)
       } catch (e2) {
-        // Approach 3: Use Function constructor as last resort
+        lastError = e2
+        // Approach 3: Try with __dirname if available
         try {
-          const requireFunc = new Function('path', 'return require(path)')
-          prismaModule = requireFunc(prismaPath)
+          // @ts-ignore
+          if (typeof __dirname !== 'undefined') {
+            // @ts-ignore
+            const { createRequire } = require('module')
+            // @ts-ignore
+            const requireFunc = createRequire(__filename || __dirname)
+            prismaModule = requireFunc(prismaPath)
+          }
         } catch (e3) {
-          throw new Error(`Failed to load Prisma Client. Tried createRequire, require, and Function constructor. Last error: ${e3}`)
+          lastError = e3
+          // Approach 4: Use Function constructor as last resort
+          try {
+            // This creates a require function that webpack can't analyze
+            const requireFunc = new Function('path', 'return require(path)')
+            prismaModule = requireFunc(prismaPath)
+          } catch (e4) {
+            throw new Error(
+              `Failed to load Prisma Client from ${prismaPath}. ` +
+              `Tried: require (${e?.message}), createRequire (${e2?.message}), ` +
+              `createRequire with __dirname (${e3?.message}), Function constructor (${e4?.message})`
+            )
+          }
         }
       }
     }
     
     if (!prismaModule || !prismaModule.PrismaClient) {
-      throw new Error(`Prisma Client not found at ${prismaPath}`)
+      throw new Error(`Prisma Client not found at ${prismaPath}. Module loaded but PrismaClient export missing.`)
     }
     
     _PrismaClient = prismaModule.PrismaClient
