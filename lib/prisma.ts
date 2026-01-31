@@ -1,7 +1,5 @@
-// Import PrismaClient directly - webpack will externalize it
-// This is the most reliable approach for serverless environments
-import { PrismaClient } from '@prisma/client'
-
+// Use dynamic require for @prisma/client - webpack will externalize it
+// This works in both CommonJS and serverless environments
 let _PrismaClient: any = null
 let _prismaInstance: any = null
 
@@ -11,9 +9,10 @@ function getPrismaClient() {
   }
   
   if (!_PrismaClient) {
-    // Use the imported PrismaClient directly
-    // Since @prisma/client is externalized by webpack, this will work at runtime
-    _PrismaClient = PrismaClient
+    // Use require for @prisma/client - webpack externalizes it so it loads at runtime
+    // @ts-ignore - @prisma/client is externalized, so this works at runtime
+    const prismaModule = require('@prisma/client')
+    _PrismaClient = prismaModule.PrismaClient || prismaModule.default?.PrismaClient
   }
   
   return _PrismaClient
