@@ -9,17 +9,26 @@ try {
   execSync('npx prisma generate', { stdio: 'inherit' })
   
   // Ensure .prisma/client/default exists for @prisma/client compatibility
+  // @prisma/client expects the generated client to be in .prisma/client/default
   const prismaClientPath = path.join(process.cwd(), 'node_modules/.prisma/client')
   const defaultPath = path.join(prismaClientPath, 'default')
   
+  if (!fs.existsSync(prismaClientPath)) {
+    console.error('Error: .prisma/client directory not found after generation')
+    process.exit(1)
+  }
+  
   // Always ensure default directory exists and is populated
   if (!fs.existsSync(defaultPath)) {
+    console.log('Creating .prisma/client/default directory...')
     fs.mkdirSync(defaultPath, { recursive: true })
   }
   
-  // Copy all files from .prisma/client to .prisma/client/default
+  // Copy all files and directories from .prisma/client to .prisma/client/default
   // This ensures @prisma/client can find the generated client
   const files = fs.readdirSync(prismaClientPath)
+  let copiedCount = 0
+  
   files.forEach(file => {
     if (file !== 'default' && !file.startsWith('.')) {
       const srcPath = path.join(prismaClientPath, file)
@@ -34,18 +43,27 @@ try {
             fs.rmSync(destPath, { recursive: true, force: true })
           }
           fs.cpSync(srcPath, destPath, { recursive: true })
+          copiedCount++
         } else {
           // Copy file
           fs.copyFileSync(srcPath, destPath)
+          copiedCount++
         }
       } catch (err) {
-        // Ignore errors for files that might already exist
         console.warn(`Warning: Could not copy ${file}:`, err.message)
       }
     }
   })
   
-  console.log('✅ Prisma client setup complete')
+  // Verify that client.ts exists in default directory
+  const clientTsPath = path.join(defaultPath, 'client.ts')
+  if (!fs.existsSync(clientTsPath)) {
+    console.error('Error: client.ts not found in .prisma/client/default')
+    console.error('This may cause "Cannot find module .prisma/client/default" errors')
+    process.exit(1)
+  }
+  
+  console.log(`✅ Prisma client setup complete (copied ${copiedCount} items to default/)`)
 } catch (error) {
   console.error('Error setting up Prisma client:', error)
   process.exit(1)
