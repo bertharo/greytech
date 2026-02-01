@@ -40,29 +40,23 @@ try {
     }
   })
   
-  // Create index.js that creates a proper module export
-  // We can't require .ts files directly, so we need to proxy through the runtime
-  const indexPath = path.join(defaultPath, 'index.js')
-  // The solution: use require.resolve to find @prisma/client, then re-export
-  // But actually, we should just make default/ a symlink or copy that works
-  // For now, let's try requiring the internal class directly
-  const indexContent = `// Prisma Client default export
-// We need to export what @prisma/client expects
-// Since we can't require .ts files, we'll use the runtime module
-const runtime = require('../internal/runtime');
-const $Class = require('../internal/class');
-
-// Re-create the PrismaClient export that client.ts has
-const PrismaClient = $Class.getPrismaClientClass ? $Class.getPrismaClientClass() : $Class.PrismaClient;
-
-module.exports = {
-  PrismaClient: PrismaClient,
-  Prisma: require('../enums').Prisma || {},
-};
-`
+  // Create a symlink from default to parent directory
+  // This makes default/ point to the same files as the parent
+  // Remove existing default if it's a directory
+  if (fs.existsSync(defaultPath)) {
+    const stat = fs.statSync(defaultPath)
+    if (stat.isDirectory()) {
+      fs.rmSync(defaultPath, { recursive: true, force: true })
+    } else if (stat.isSymbolicLink()) {
+      fs.unlinkSync(defaultPath)
+    }
+  }
   
-  fs.writeFileSync(indexPath, indexContent)
-  console.log('✅ Prisma client generated and default directory created with all files')
+  // Create symlink: default -> .. (parent directory)
+  // This makes .prisma/client/default/client.ts resolve to .prisma/client/client.ts
+  fs.symlinkSync('..', defaultPath, 'dir')
+  
+  console.log('✅ Prisma client generated and default directory symlinked to parent')
 } catch (error) {
   console.error('Error setting up Prisma client:', error)
   process.exit(1)
