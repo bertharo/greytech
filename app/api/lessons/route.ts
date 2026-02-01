@@ -20,18 +20,30 @@ export async function GET() {
       select: { skillLevel: true }
     })
 
-    // Get categories with lessons
+    // Determine which difficulty levels to show based on user's skill level
+    // Users see lessons matching their level and below (progressive learning)
+    const skillLevel = user?.skillLevel || 'Beginner'
+    const allowedDifficulties = 
+      skillLevel === 'Advanced' ? ['Beginner', 'Intermediate', 'Advanced'] :
+      skillLevel === 'Intermediate' ? ['Beginner', 'Intermediate'] :
+      ['Beginner'] // Beginner users only see Beginner lessons
+
+    // Get categories with lessons filtered by user's skill level
     const categories = await prisma.category.findMany({
       where: {
         lessons: {
           some: {
-            isActive: true
+            isActive: true,
+            difficulty: { in: allowedDifficulties }
           }
         }
       },
       include: {
         lessons: {
-          where: { isActive: true },
+          where: { 
+            isActive: true,
+            difficulty: { in: allowedDifficulties }
+          },
           orderBy: { order: 'asc' },
           include: {
             progress: {
