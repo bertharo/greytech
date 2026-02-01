@@ -64,35 +64,67 @@ try {
   }
   
   // Create index.js in default directory to make it importable as a module
-  // @prisma/client/default.js requires '.prisma/client/default' which should export the client
-  // Since we copy client.ts to default/, we should require from the same directory
+  // Instead of requiring client.ts (which Node.js can't handle), we'll re-export from @prisma/client
+  // This avoids the TypeScript file resolution issue
   const indexPath = path.join(defaultPath, 'index.js')
-  const clientTsInDefault = path.join(defaultPath, 'client.ts')
-  const clientInParent = path.join(prismaClientPath, 'client.ts')
   
-  // Check if client.ts exists in default directory (we copy it there)
-  // If not, require from parent
-  let indexContent
-  if (fs.existsSync(clientTsInDefault)) {
-    // Client file is in default directory, require from same directory
-    // Note: TypeScript files need to be handled by the build system
-    // In Next.js, they're transpiled, so we can require them
-    indexContent = `// Prisma Client default export
-// Client file is in the same directory (copied during postinstall)
+  // Create a proper module that re-exports from @prisma/client
+  // This works because @prisma/client should be able to find the generated client
+  const indexContent = `// Prisma Client default export for @prisma/client compatibility
+// Re-export from @prisma/client which handles the client resolution internally
 try {
-  module.exports = require('./client');
+  // Try to require from @prisma/client directly
+  const prismaClient = require('@prisma/client');
+  module.exports = prismaClient;
 } catch (e) {
-  // Fallback to parent if same directory doesn't work
-  module.exports = require('../client');
+  // Fallback: try to require the client file directly using path resolution
+  const path = require('path');
+  const fs = require('fs');
+  
+  // Try multiple possible locations
+  const possiblePaths = [
+    path.join(__dirname, '..', 'client'),
+    path.join(__dirname, 'client'),
+    path.resolve(__dirname, '..', 'client.ts'),
+    path.resolve(__dirname, 'client.ts')
+  ];
+  
+  let loaded = false;
+  for (const clientPath of possiblePaths) {
+    try {
+      if (fs.existsSync(clientPath) || fs.existsSync(clientPath + '.ts') || fs.existsSync(clientPath + '.js')) {
+        try {
+          module.exports = require(clientPath);
+          loaded = true;
+          break;
+        } catch (e2) {
+          // Try with .ts extension
+          try {
+            module.exports = require(clientPath + '.ts');
+            loaded = true;
+            break;
+          } catch (e3) {
+            // Try with .js extension
+            try {
+              module.exports = require(clientPath + '.js');
+              loaded = true;
+              break;
+            } catch (e4) {
+              // Continue to next path
+            }
+          }
+        }
+      }
+    } catch (e5) {
+      // Continue to next path
+    }
+  }
+  
+  if (!loaded) {
+    throw new Error(\`Failed to load Prisma Client from any path. Original error: \${e.message}\`);
+  }
 }
 `
-  } else {
-    // Client file not in default, require from parent
-    indexContent = `// Prisma Client default export
-// Require from parent directory where Prisma generates the client
-module.exports = require('../client');
-`
-  }
   
   fs.writeFileSync(indexPath, indexContent)
   console.log('Created/updated index.js in default directory')
