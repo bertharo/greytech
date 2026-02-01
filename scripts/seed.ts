@@ -1,6 +1,7 @@
-import { PrismaClient } from '@prisma/client'
+// Use require for Prisma client to work with the generated client structure
+// @ts-ignore - @prisma/client is externalized
+const { PrismaClient } = require('@prisma/client')
 
-// @ts-ignore - Prisma 7 type issue, works at runtime
 const prisma = new PrismaClient()
 
 async function main() {
