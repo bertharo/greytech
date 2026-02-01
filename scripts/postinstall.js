@@ -40,12 +40,25 @@ try {
     }
   })
   
-  // Create index.js that exports from the copied client.ts
-  // In Next.js/serverless, TypeScript files in node_modules are handled
+  // Create index.js that re-exports from parent directory
+  // Since Node.js can't require .ts files directly, we need to use the parent
+  // which should be handled by Next.js/webpack during build
   const indexPath = path.join(defaultPath, 'index.js')
-  const indexContent = `// Export Prisma client from copied files
-// In Next.js, TypeScript files are transpiled, so this should work
-module.exports = require('./client');
+  // Use a workaround: re-export from @prisma/client which should work
+  // because webpack externalizes it and it resolves at runtime
+  const indexContent = `// Re-export Prisma client
+// Use @prisma/client which webpack externalizes and resolves at runtime
+// This avoids TypeScript file resolution issues
+try {
+  module.exports = require('@prisma/client');
+} catch (e) {
+  // If that fails, try to require from parent (might work in some environments)
+  try {
+    module.exports = require('../client');
+  } catch (e2) {
+    throw new Error(\`Failed to load Prisma Client: \${e.message}. Fallback: \${e2.message}\`);
+  }
+}
 `
   
   fs.writeFileSync(indexPath, indexContent)
