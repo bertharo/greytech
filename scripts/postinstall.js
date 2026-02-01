@@ -64,26 +64,43 @@ try {
   }
   
   // Create index.js in default directory to make it importable as a module
-  // Use absolute path resolution to ensure it works in serverless environments
+  // The client.ts file needs to be required, but Node.js can't directly require .ts files
+  // Instead, we need to re-export from the parent directory's client
+  // Since files are copied to default/, we can require them directly
   const indexPath = path.join(defaultPath, 'index.js')
-  const clientPath = path.join(prismaClientPath, 'client')
   
-  // Try multiple approaches for the require path
-  const indexContent = `// Prisma Client default export
-const path = require('path');
-const clientPath = path.join(__dirname, '..', 'client');
+  // Check if client.js exists (compiled) or if we need to use client.ts
+  const clientJsPath = path.join(defaultPath, 'client.js')
+  const clientTsPath = path.join(defaultPath, 'client.ts')
+  
+  let indexContent
+  if (fs.existsSync(clientJsPath)) {
+    // Use compiled JS file
+    indexContent = "module.exports = require('./client');\n"
+  } else if (fs.existsSync(clientTsPath)) {
+    // Try to require the TS file (may work in some environments)
+    // Otherwise, try to require from parent
+    indexContent = `// Prisma Client default export
 try {
-  module.exports = require(clientPath);
+  // Try requiring the copied client.ts file
+  module.exports = require('./client');
 } catch (e) {
-  // Fallback: try relative path
+  // Fallback: require from parent directory
   try {
     module.exports = require('../client');
   } catch (e2) {
-    // Last resort: try direct require
-    module.exports = require('${clientPath.replace(/\\/g, '/')}');
+    // Last fallback: use path resolution
+    const path = require('path');
+    const clientPath = path.join(__dirname, '..', 'client');
+    module.exports = require(clientPath);
   }
 }
 `
+  } else {
+    // No client file found, try parent
+    indexContent = "module.exports = require('../client');\n"
+  }
+  
   fs.writeFileSync(indexPath, indexContent)
   console.log('Created/updated index.js in default directory')
   
