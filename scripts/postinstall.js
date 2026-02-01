@@ -17,29 +17,6 @@ try {
     fs.mkdirSync(defaultPath, { recursive: true })
   }
   
-  // Copy all necessary files to default directory
-  const filesToCopy = ['client.ts', 'enums.ts', 'browser.ts', 'models.ts', 'commonInputTypes.ts']
-  filesToCopy.forEach(file => {
-    const srcPath = path.join(prismaClientPath, file)
-    const destPath = path.join(defaultPath, file)
-    if (fs.existsSync(srcPath)) {
-      fs.copyFileSync(srcPath, destPath)
-    }
-  })
-  
-  // Copy directories
-  const dirsToCopy = ['internal', 'models']
-  dirsToCopy.forEach(dir => {
-    const srcDir = path.join(prismaClientPath, dir)
-    const destDir = path.join(defaultPath, dir)
-    if (fs.existsSync(srcDir)) {
-      if (fs.existsSync(destDir)) {
-        fs.rmSync(destDir, { recursive: true, force: true })
-      }
-      fs.cpSync(srcDir, destDir, { recursive: true })
-    }
-  })
-  
   // Copy all files to default directory first
   const filesToCopy = ['client.ts', 'enums.ts', 'browser.ts', 'models.ts', 'commonInputTypes.ts']
   filesToCopy.forEach(file => {
