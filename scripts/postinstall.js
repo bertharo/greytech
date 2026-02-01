@@ -40,56 +40,21 @@ try {
     }
   })
   
-  // Create index.js - use a workaround for TypeScript files
-  // In Next.js build, TypeScript in node_modules might be transpiled
-  // But for now, we'll create a minimal export that defers loading
+  // Create index.js that directly re-exports from parent
+  // Since we can't require .ts files, we'll use a simple re-export
+  // that Next.js/webpack will handle during build
   const indexPath = path.join(defaultPath, 'index.js')
   
-  // Create a proxy that loads the client on first access
-  // This defers the TypeScript require until it's actually needed
-  const indexContent = `// Prisma Client default export - deferred loading
-// This file is required by @prisma/client/default.js
-// We use a proxy to defer loading until actually needed
-
-let _clientModule = null;
-
-function getClientModule() {
-  if (!_clientModule) {
-    // Try to require the client - in Next.js build, TS files might be handled
-    // If that fails, we'll get a clear error
-    try {
-      _clientModule = require('./client');
-    } catch (e) {
-      // If direct require fails, try parent
-      try {
-        _clientModule = require('../client');
-      } catch (e2) {
-        throw new Error(\`Failed to load Prisma Client: \${e.message}. Fallback: \${e2.message}\`);
-      }
-    }
-  }
-  return _clientModule;
-}
-
-// Export a proxy that loads on access
-module.exports = new Proxy({}, {
-  get(target, prop) {
-    const module = getClientModule();
-    return module[prop];
-  },
-  ownKeys() {
-    const module = getClientModule();
-    return Reflect.ownKeys(module);
-  },
-  getOwnPropertyDescriptor(target, prop) {
-    const module = getClientModule();
-    return Reflect.getOwnPropertyDescriptor(module, prop);
-  }
-});
+  // Simple re-export - webpack should handle the TypeScript resolution
+  // during build time, and at runtime the files will be transpiled
+  const indexContent = `// Prisma Client default export
+// Re-export from parent directory
+// Next.js/webpack will transpile TypeScript files during build
+module.exports = require('../client');
 `
   
   fs.writeFileSync(indexPath, indexContent)
-  console.log('✅ Prisma client generated and default directory created with deferred loading proxy')
+  console.log('✅ Prisma client generated and default directory created')
 } catch (error) {
   console.error('Error setting up Prisma client:', error)
   process.exit(1)
