@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  // Transpile Prisma client packages so TypeScript files are processed
+  transpilePackages: ['.prisma', '@prisma/client'],
+  
   // Explicitly use webpack for Prisma compatibility
   webpack: (config, { isServer }) => {
     if (isServer) {
