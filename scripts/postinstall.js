@@ -63,6 +63,13 @@ try {
     process.exit(1)
   }
   
+  // Create index.js in default directory to make it importable as a module
+  const indexPath = path.join(defaultPath, 'index.js')
+  if (!fs.existsSync(indexPath)) {
+    fs.writeFileSync(indexPath, "module.exports = require('../client');\n")
+    console.log('Created index.js in default directory')
+  }
+  
   console.log(`✅ Prisma client setup complete (copied ${copiedCount} items to default/)`)
 } catch (error) {
   console.error('Error setting up Prisma client:', error)
