@@ -10,10 +10,23 @@ function getPrismaClient() {
     throw new Error('Prisma Client should only be used on the server')
   }
   
-  // Use standard @prisma/client import - Prisma handles the client resolution
-  // @ts-ignore - @prisma/client is externalized by webpack
-  const { PrismaClient } = require('@prisma/client')
-  return PrismaClient
+  // Bypass @prisma/client/default.js and import directly from generated client
+  // This avoids the TypeScript file resolution issues
+  try {
+    const path = require('path')
+    // Try to require the generated client directly
+    const clientPath = path.join(process.cwd(), 'node_modules', '.prisma', 'client', 'client')
+    const prismaModule = require(clientPath)
+    return prismaModule.PrismaClient || prismaModule.default?.PrismaClient
+  } catch (e) {
+    // Fallback: try @prisma/client (might work in some environments)
+    try {
+      const { PrismaClient } = require('@prisma/client')
+      return PrismaClient
+    } catch (e2) {
+      throw new Error(`Failed to load Prisma Client: ${e.message}. Fallback also failed: ${e2.message}`)
+    }
+  }
 }
 
 // Initialize Prisma Client instance
