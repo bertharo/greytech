@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -60,7 +61,22 @@ export default function RegisterPage() {
         return
       }
 
-      // Redirect to assessment
+      // Auto-login after successful registration
+      const signInResult = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false
+      })
+
+      if (signInResult?.error) {
+        // If auto-login fails, redirect to login page
+        setErrors({ general: 'Account created but login failed. Please log in manually.' })
+        setLoading(false)
+        router.push('/login')
+        return
+      }
+
+      // Redirect to assessment after successful login
       router.push('/assessment')
     } catch (error) {
       setErrors({ general: 'Something went wrong. Please try again.' })
