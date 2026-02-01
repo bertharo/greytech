@@ -17,11 +17,25 @@ try {
     fs.mkdirSync(defaultPath, { recursive: true })
   }
   
-  // Create index.js that re-exports from parent client
-  // The client.ts is in the parent directory
+  // Copy client.ts to default directory so we can require it
+  const clientTsPath = path.join(prismaClientPath, 'client.ts')
+  const clientTsInDefault = path.join(defaultPath, 'client.ts')
+  
+  if (fs.existsSync(clientTsPath)) {
+    fs.copyFileSync(clientTsPath, clientTsInDefault)
+  }
+  
+  // Create index.js that requires from same directory
   const indexPath = path.join(defaultPath, 'index.js')
-  const indexContent = `// Re-export Prisma client from parent directory
-module.exports = require('../client');
+  // In Next.js/serverless, TypeScript files are handled, but we'll try both
+  const indexContent = `// Re-export Prisma client
+// Try to require from same directory first (where we copied client.ts)
+try {
+  module.exports = require('./client');
+} catch (e) {
+  // Fallback: try parent directory
+  module.exports = require('../client');
+}
 `
   
   fs.writeFileSync(indexPath, indexContent)
