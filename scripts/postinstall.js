@@ -40,41 +40,79 @@ try {
     }
   })
   
-  // Create index.js that properly exports PrismaClient
-  // We can't require .ts files directly, so we need to use the Prisma runtime
-  // The runtime is in JavaScript and can be required
+  // Copy all files to default directory first
+  const filesToCopy = ['client.ts', 'enums.ts', 'browser.ts', 'models.ts', 'commonInputTypes.ts']
+  filesToCopy.forEach(file => {
+    const srcPath = path.join(prismaClientPath, file)
+    const destPath = path.join(defaultPath, file)
+    if (fs.existsSync(srcPath)) {
+      fs.copyFileSync(srcPath, destPath)
+    }
+  })
+  
+  // Copy directories
+  const dirsToCopy = ['internal', 'models']
+  dirsToCopy.forEach(dir => {
+    const srcDir = path.join(prismaClientPath, dir)
+    const destDir = path.join(defaultPath, dir)
+    if (fs.existsSync(srcDir)) {
+      if (fs.existsSync(destDir)) {
+        fs.rmSync(destDir, { recursive: true, force: true })
+      }
+      fs.cpSync(srcDir, destDir, { recursive: true })
+    }
+  })
+  
+  // Create index.js - use a workaround for TypeScript files
+  // In Next.js build, TypeScript in node_modules might be transpiled
+  // But for now, we'll create a minimal export that defers loading
   const indexPath = path.join(defaultPath, 'index.js')
   
-  // Use Prisma's runtime to get the PrismaClient class
-  // This avoids TypeScript file resolution issues
-  const indexContent = `// Prisma Client default export
-// Use Prisma runtime to construct PrismaClient without requiring .ts files
-const runtime = require('@prisma/client/runtime/library');
-const { getPrismaClient } = require('@prisma/client/runtime');
+  // Create a proxy that loads the client on first access
+  // This defers the TypeScript require until it's actually needed
+  const indexContent = `// Prisma Client default export - deferred loading
+// This file is required by @prisma/client/default.js
+// We use a proxy to defer loading until actually needed
 
-// Get the PrismaClient class from the runtime
-// The runtime has the actual JavaScript implementation
-const PrismaClient = getPrismaClient ? getPrismaClient() : runtime.PrismaClient;
+let _clientModule = null;
 
-if (!PrismaClient) {
-  // Fallback: try to get it from the generated client using dynamic import
-  // This will work in Next.js where TypeScript is transpiled
-  try {
-    const clientModule = require('../client');
-    module.exports = clientModule;
-  } catch (e) {
-    throw new Error('Failed to load Prisma Client. Make sure Prisma client is generated.');
+function getClientModule() {
+  if (!_clientModule) {
+    // Try to require the client - in Next.js build, TS files might be handled
+    // If that fails, we'll get a clear error
+    try {
+      _clientModule = require('./client');
+    } catch (e) {
+      // If direct require fails, try parent
+      try {
+        _clientModule = require('../client');
+      } catch (e2) {
+        throw new Error(\`Failed to load Prisma Client: \${e.message}. Fallback: \${e2.message}\`);
+      }
+    }
   }
-} else {
-  module.exports = {
-    PrismaClient: PrismaClient,
-    Prisma: require('../enums')?.Prisma || {},
-  };
+  return _clientModule;
 }
+
+// Export a proxy that loads on access
+module.exports = new Proxy({}, {
+  get(target, prop) {
+    const module = getClientModule();
+    return module[prop];
+  },
+  ownKeys() {
+    const module = getClientModule();
+    return Reflect.ownKeys(module);
+  },
+  getOwnPropertyDescriptor(target, prop) {
+    const module = getClientModule();
+    return Reflect.getOwnPropertyDescriptor(module, prop);
+  }
+});
 `
   
   fs.writeFileSync(indexPath, indexContent)
-  console.log('✅ Prisma client generated and default directory created with JavaScript wrapper')
+  console.log('✅ Prisma client generated and default directory created with deferred loading proxy')
 } catch (error) {
   console.error('Error setting up Prisma client:', error)
   process.exit(1)
