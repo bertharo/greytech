@@ -28,6 +28,10 @@ export async function GET() {
       skillLevel === 'Intermediate' ? ['Beginner', 'Intermediate'] :
       ['Beginner'] // Beginner users only see Beginner lessons
 
+    // Debug logging
+    console.log('User skill level:', skillLevel)
+    console.log('Allowed difficulties:', allowedDifficulties)
+
     // Get categories with lessons filtered by user's skill level
     const categories = await prisma.category.findMany({
       where: {
@@ -56,6 +60,12 @@ export async function GET() {
       orderBy: { order: 'asc' }
     })
 
+    // Debug logging
+    console.log('Categories found:', categories.length)
+    categories.forEach((cat: any) => {
+      console.log(`Category: ${cat.name}, Lessons: ${cat.lessons.length}`)
+    })
+
     // Format response
     const formattedCategories = categories.map((category: any) => ({
       id: category.id,
@@ -77,6 +87,7 @@ export async function GET() {
       }))
     }))
 
+    console.log('Returning categories:', formattedCategories.length)
     return NextResponse.json(formattedCategories)
   } catch (error) {
     console.error('Get lessons error:', error)
