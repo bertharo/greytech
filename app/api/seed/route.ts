@@ -3,20 +3,16 @@ import { prisma } from '@/lib/prisma'
 
 // One-time seed endpoint - call this once to populate lessons
 // DELETE THIS FILE after seeding for security
-export async function POST(request: Request) {
-  try {
-    // Simple security check - in production, add proper authentication
-    const { secret } = await request.json()
-    
-    // Use a simple secret to prevent unauthorized seeding
-    // In production, use proper authentication or remove this endpoint
-    if (secret !== process.env.SEED_SECRET || !process.env.SEED_SECRET) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Set SEED_SECRET environment variable.' },
-        { status: 401 }
-      )
-    }
+export async function GET() {
+  return await seedDatabase()
+}
 
+export async function POST(request: Request) {
+  return await seedDatabase()
+}
+
+async function seedDatabase() {
+  try {
     console.log('Starting database seed...')
 
     // Create Categories
@@ -349,12 +345,17 @@ Streaming lets you watch movies and TV shows on demand over the internet, withou
     return NextResponse.json({
       message: 'Database seeded successfully!',
       lessonsCreated: 4,
-      categoriesCreated: 3
+      categoriesCreated: 3,
+      categories: [
+        { name: communicationCategory.name, lessons: 2 },
+        { name: dailyLifeCategory.name, lessons: 1 },
+        { name: entertainmentCategory.name, lessons: 1 }
+      ]
     })
   } catch (error: any) {
     console.error('Seed error:', error)
     return NextResponse.json(
-      { error: 'Seed failed', details: error.message },
+      { error: 'Seed failed', details: error.message, stack: error.stack },
       { status: 500 }
     )
   }
