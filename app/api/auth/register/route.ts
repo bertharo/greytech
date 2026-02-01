@@ -42,7 +42,7 @@ export async function POST(request: Request) {
         email,
         password: hashedPassword,
         skillLevel: 'Beginner',
-        dailyTimeCommitment: 10,
+        dailyTimeCommit: 10,
         currentLevel: 1,
         totalXP: 0,
         hearts: 5

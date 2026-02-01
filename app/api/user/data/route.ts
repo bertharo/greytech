@@ -23,7 +23,7 @@ export async function GET() {
         currentStreak: true,
         hearts: true,
         skillLevel: true,
-        dailyTimeCommitment: true
+        dailyTimeCommit: true
       }
     })
 
