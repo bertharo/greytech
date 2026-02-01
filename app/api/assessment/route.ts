@@ -16,33 +16,13 @@ export async function POST(request: Request) {
 
     const { answers, calculatedScore, skillLevel } = await request.json()
 
-    // Check if assessment already exists
-    const existingAssessment = await prisma.assessment.findUnique({
-      where: { userId: session.user.id }
+    // Update user's skill level directly (assessment data is stored in User model)
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        skillLevel: skillLevel
+      }
     })
-
-    if (existingAssessment) {
-      // Update existing assessment
-      await prisma.assessment.update({
-        where: { userId: session.user.id },
-        data: {
-          answers: JSON.stringify(answers),
-          calculatedScore,
-          skillLevel,
-          completedAt: new Date()
-        }
-      })
-    } else {
-      // Create new assessment
-      await prisma.assessment.create({
-        data: {
-          userId: session.user.id,
-          answers: JSON.stringify(answers),
-          calculatedScore,
-          skillLevel
-        }
-      })
-    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
