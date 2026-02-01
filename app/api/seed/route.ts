@@ -3,11 +3,12 @@ import { prisma } from '@/lib/prisma'
 
 // One-time seed endpoint - call this once to populate lessons
 // DELETE THIS FILE after seeding for security
+// This endpoint is public and doesn't require authentication
 export async function GET() {
   return await seedDatabase()
 }
 
-export async function POST(request: Request) {
+export async function POST() {
   return await seedDatabase()
 }
 
