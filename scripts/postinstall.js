@@ -17,29 +17,39 @@ try {
     fs.mkdirSync(defaultPath, { recursive: true })
   }
   
-  // Copy client.ts to default directory so we can require it
-  const clientTsPath = path.join(prismaClientPath, 'client.ts')
-  const clientTsInDefault = path.join(defaultPath, 'client.ts')
+  // Copy all necessary files to default directory
+  const filesToCopy = ['client.ts', 'enums.ts', 'browser.ts', 'models.ts', 'commonInputTypes.ts']
+  filesToCopy.forEach(file => {
+    const srcPath = path.join(prismaClientPath, file)
+    const destPath = path.join(defaultPath, file)
+    if (fs.existsSync(srcPath)) {
+      fs.copyFileSync(srcPath, destPath)
+    }
+  })
   
-  if (fs.existsSync(clientTsPath)) {
-    fs.copyFileSync(clientTsPath, clientTsInDefault)
-  }
+  // Copy directories
+  const dirsToCopy = ['internal', 'models']
+  dirsToCopy.forEach(dir => {
+    const srcDir = path.join(prismaClientPath, dir)
+    const destDir = path.join(defaultPath, dir)
+    if (fs.existsSync(srcDir)) {
+      if (fs.existsSync(destDir)) {
+        fs.rmSync(destDir, { recursive: true, force: true })
+      }
+      fs.cpSync(srcDir, destDir, { recursive: true })
+    }
+  })
   
-  // Create index.js that requires from same directory
+  // Create index.js that exports from the copied client.ts
+  // In Next.js/serverless, TypeScript files in node_modules are handled
   const indexPath = path.join(defaultPath, 'index.js')
-  // In Next.js/serverless, TypeScript files are handled, but we'll try both
-  const indexContent = `// Re-export Prisma client
-// Try to require from same directory first (where we copied client.ts)
-try {
-  module.exports = require('./client');
-} catch (e) {
-  // Fallback: try parent directory
-  module.exports = require('../client');
-}
+  const indexContent = `// Export Prisma client from copied files
+// In Next.js, TypeScript files are transpiled, so this should work
+module.exports = require('./client');
 `
   
   fs.writeFileSync(indexPath, indexContent)
-  console.log('✅ Prisma client generated and default directory created')
+  console.log('✅ Prisma client generated and default directory created with all files')
 } catch (error) {
   console.error('Error setting up Prisma client:', error)
   process.exit(1)
