@@ -10,23 +10,21 @@ function getPrismaClient() {
     throw new Error('Prisma Client should only be used on the server')
   }
   
-  // Bypass @prisma/client/default.js and import directly from generated client
-  // This avoids the TypeScript file resolution issues
-  try {
-    const path = require('path')
-    // Try to require the generated client directly
-    const clientPath = path.join(process.cwd(), 'node_modules', '.prisma', 'client', 'client')
-    const prismaModule = require(clientPath)
-    return prismaModule.PrismaClient || prismaModule.default?.PrismaClient
-  } catch (e) {
-    // Fallback: try @prisma/client (might work in some environments)
-    try {
-      const { PrismaClient } = require('@prisma/client')
-      return PrismaClient
-    } catch (e2) {
-      throw new Error(`Failed to load Prisma Client: ${e.message}. Fallback also failed: ${e2.message}`)
-    }
+  // Use dynamic import for @prisma/client - webpack externalizes it
+  // In serverless, the client should be available at runtime
+  // @ts-ignore - @prisma/client is externalized by webpack
+  const prismaModule = require('@prisma/client')
+  
+  // PrismaClient might be in different places depending on Prisma version
+  const PrismaClient = prismaModule.PrismaClient || 
+                       prismaModule.default?.PrismaClient || 
+                       prismaModule.default
+  
+  if (!PrismaClient) {
+    throw new Error('PrismaClient not found in @prisma/client module. Make sure Prisma client is generated.')
   }
+  
+  return PrismaClient
 }
 
 // Initialize Prisma Client instance
