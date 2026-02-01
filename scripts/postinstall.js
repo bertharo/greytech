@@ -64,42 +64,16 @@ try {
   }
   
   // Create index.js in default directory to make it importable as a module
-  // The client.ts file needs to be required, but Node.js can't directly require .ts files
-  // Instead, we need to re-export from the parent directory's client
-  // Since files are copied to default/, we can require them directly
+  // Since we copy all files to default/, we should require from the same directory
+  // In Next.js/serverless, TypeScript files are transpiled, so we can require them
   const indexPath = path.join(defaultPath, 'index.js')
   
-  // Check if client.js exists (compiled) or if we need to use client.ts
-  const clientJsPath = path.join(defaultPath, 'client.js')
-  const clientTsPath = path.join(defaultPath, 'client.ts')
-  
-  let indexContent
-  if (fs.existsSync(clientJsPath)) {
-    // Use compiled JS file
-    indexContent = "module.exports = require('./client');\n"
-  } else if (fs.existsSync(clientTsPath)) {
-    // Try to require the TS file (may work in some environments)
-    // Otherwise, try to require from parent
-    indexContent = `// Prisma Client default export
-try {
-  // Try requiring the copied client.ts file
-  module.exports = require('./client');
-} catch (e) {
-  // Fallback: require from parent directory
-  try {
-    module.exports = require('../client');
-  } catch (e2) {
-    // Last fallback: use path resolution
-    const path = require('path');
-    const clientPath = path.join(__dirname, '..', 'client');
-    module.exports = require(clientPath);
-  }
-}
+  // Simple approach: require from parent directory (where the actual client.ts is)
+  // The default directory is just for @prisma/client to find it, but the real file is in parent
+  const indexContent = `// Prisma Client default export for @prisma/client compatibility
+// Re-export from parent directory where the actual Prisma client is generated
+module.exports = require('../client');
 `
-  } else {
-    // No client file found, try parent
-    indexContent = "module.exports = require('../client');\n"
-  }
   
   fs.writeFileSync(indexPath, indexContent)
   console.log('Created/updated index.js in default directory')
