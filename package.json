@@ -7,6 +7,7 @@
     "dev:turbo": "next dev",
     "build": "prisma generate && node scripts/postinstall.js && next build --webpack",
     "postinstall": "prisma generate && node scripts/postinstall.js",
+    "vercel-build": "prisma generate && node scripts/postinstall.js && next build",
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx scripts/seed.ts"
