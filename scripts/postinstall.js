@@ -64,11 +64,28 @@ try {
   }
   
   // Create index.js in default directory to make it importable as a module
+  // Use absolute path resolution to ensure it works in serverless environments
   const indexPath = path.join(defaultPath, 'index.js')
-  if (!fs.existsSync(indexPath)) {
-    fs.writeFileSync(indexPath, "module.exports = require('../client');\n")
-    console.log('Created index.js in default directory')
+  const clientPath = path.join(prismaClientPath, 'client')
+  
+  // Try multiple approaches for the require path
+  const indexContent = `// Prisma Client default export
+const path = require('path');
+const clientPath = path.join(__dirname, '..', 'client');
+try {
+  module.exports = require(clientPath);
+} catch (e) {
+  // Fallback: try relative path
+  try {
+    module.exports = require('../client');
+  } catch (e2) {
+    // Last resort: try direct require
+    module.exports = require('${clientPath.replace(/\\/g, '/')}');
   }
+}
+`
+  fs.writeFileSync(indexPath, indexContent)
+  console.log('Created/updated index.js in default directory')
   
   console.log(`✅ Prisma client setup complete (copied ${copiedCount} items to default/)`)
 } catch (error) {
