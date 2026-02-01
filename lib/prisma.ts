@@ -1,9 +1,9 @@
 // Prisma Client singleton pattern - recommended for Next.js
 // This prevents multiple instances in development and works in serverless
-import { PrismaClient } from '@prisma/client'
+const { PrismaClient } = require('@prisma/client')
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
+  prisma: any | undefined
 }
 
 export const prisma =
