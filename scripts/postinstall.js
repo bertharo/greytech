@@ -40,25 +40,25 @@ try {
     }
   })
   
-  // Create index.js that re-exports from parent directory
-  // Since Node.js can't require .ts files directly, we need to use the parent
-  // which should be handled by Next.js/webpack during build
+  // Create index.js that creates a proper module export
+  // We can't require .ts files directly, so we need to proxy through the runtime
   const indexPath = path.join(defaultPath, 'index.js')
-  // Use a workaround: re-export from @prisma/client which should work
-  // because webpack externalizes it and it resolves at runtime
-  const indexContent = `// Re-export Prisma client
-// Use @prisma/client which webpack externalizes and resolves at runtime
-// This avoids TypeScript file resolution issues
-try {
-  module.exports = require('@prisma/client');
-} catch (e) {
-  // If that fails, try to require from parent (might work in some environments)
-  try {
-    module.exports = require('../client');
-  } catch (e2) {
-    throw new Error(\`Failed to load Prisma Client: \${e.message}. Fallback: \${e2.message}\`);
-  }
-}
+  // The solution: use require.resolve to find @prisma/client, then re-export
+  // But actually, we should just make default/ a symlink or copy that works
+  // For now, let's try requiring the internal class directly
+  const indexContent = `// Prisma Client default export
+// We need to export what @prisma/client expects
+// Since we can't require .ts files, we'll use the runtime module
+const runtime = require('../internal/runtime');
+const $Class = require('../internal/class');
+
+// Re-create the PrismaClient export that client.ts has
+const PrismaClient = $Class.getPrismaClientClass ? $Class.getPrismaClientClass() : $Class.PrismaClient;
+
+module.exports = {
+  PrismaClient: PrismaClient,
+  Prisma: require('../enums').Prisma || {},
+};
 `
   
   fs.writeFileSync(indexPath, indexContent)
