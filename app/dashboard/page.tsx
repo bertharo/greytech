@@ -15,7 +15,7 @@ interface UserData {
   currentStreak: number
   hearts: number
   skillLevel: string
-  dailyTimeCommitment: number
+  dailyTimeCommit: number
 }
 
 export default function DashboardPage() {
@@ -175,7 +175,7 @@ export default function DashboardPage() {
               <div>
                 <h2 className="text-xl font-semibold mb-1">Today's Goal</h2>
                 <p className="text-gray-600">
-                  Complete {userData.dailyTimeCommitment} minutes of learning
+                  Complete {userData.dailyTimeCommit} minutes of learning
                 </p>
               </div>
             </div>

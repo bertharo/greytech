@@ -26,7 +26,7 @@ export default function TimeCommitmentPage() {
       const response = await fetch('/api/user/update-time', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dailyTimeCommitment: selectedTime })
+        body: JSON.stringify({ dailyTimeCommitment: selectedTime }) // API expects dailyTimeCommitment, maps to dailyTimeCommit
       })
 
       if (!response.ok) {

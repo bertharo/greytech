@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { dailyTimeCommitment }
+      data: { dailyTimeCommit: dailyTimeCommitment }
     })
 
     return NextResponse.json({ success: true })
