@@ -64,15 +64,36 @@ try {
   }
   
   // Create index.js in default directory to make it importable as a module
-  // Since we copy all files to default/, we should require from the same directory
-  // In Next.js/serverless, TypeScript files are transpiled, so we can require them
+  // @prisma/client/default.js requires '.prisma/client/default' which should export the client
+  // We need to re-export from the parent client.ts file
   const indexPath = path.join(defaultPath, 'index.js')
   
-  // Simple approach: require from parent directory (where the actual client.ts is)
-  // The default directory is just for @prisma/client to find it, but the real file is in parent
+  // The client.ts file is in the parent directory
+  // In serverless, we need to use path resolution that works across environments
   const indexContent = `// Prisma Client default export for @prisma/client compatibility
-// Re-export from parent directory where the actual Prisma client is generated
-module.exports = require('../client');
+// This file makes .prisma/client/default importable as a module
+const path = require('path');
+
+// Try to require from parent directory
+// The actual Prisma client is generated in .prisma/client/client.ts
+// In Next.js/serverless, TypeScript files are handled by the build system
+try {
+  // First try: require from parent (most common case)
+  module.exports = require('../client');
+} catch (e) {
+  // Fallback: try with explicit path resolution
+  const clientPath = path.resolve(__dirname, '..', 'client');
+  try {
+    module.exports = require(clientPath);
+  } catch (e2) {
+    // Last resort: try without extension (Node.js might resolve it)
+    try {
+      module.exports = require('../client.ts');
+    } catch (e3) {
+      throw new Error(\`Failed to load Prisma Client: \${e.message}. Fallbacks also failed.\`);
+    }
+  }
+}
 `
   
   fs.writeFileSync(indexPath, indexContent)
